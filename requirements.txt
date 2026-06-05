@@ -18,6 +18,3 @@ polygon-api-client==1.14.2
 discord.py==2.4.0
 aiofiles==24.1.0
 python-multipart==0.0.20
-fastapi
-uvicorn
-cerebras-cloud-sdk

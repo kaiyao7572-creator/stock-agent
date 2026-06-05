@@ -134,9 +134,9 @@ async def tradingview_webhook(payload: TradingViewPayload):
         raise HTTPException(status_code=503, detail="Alert queue full. Retry later.")
     return {"status": "queued", "ticker": payload.ticker}
 
-from fastapi import Depends
+
 @app.get("/analysis/{ticker}")
-async def get_analysis(ticker: str, _=Depends(verify_api_key)):
+async def get_analysis(ticker: str):
     """Return the most recent analysis for a ticker."""
     ticker = ticker.upper().strip()
     async with get_session() as db:
