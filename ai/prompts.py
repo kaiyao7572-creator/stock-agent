@@ -69,9 +69,9 @@ Interpret as:
 - 60–69: Weak evidence
 - <60: Insufficient evidence — avoid
 
-### 8. Overall Rating
-One of: STRONG BUY / BUY / HOLD / SELL / STRONG SELL  
-Followed by a single sentence justification.
+### 8. Watchlist Assessment
+One of: HIGH-INTEREST WATCHLIST CANDIDATE / WATCHLIST CANDIDATE / NEUTRAL MONITOR / CAUTION / HIGH RISK  
+Followed by a single sentence justification. Do not tell the reader to buy, sell, or hold.
 """
 
 

@@ -30,8 +30,7 @@ async def generate_daily_report(top_n: int = 10) -> dict[str, Any]:
     since = datetime.utcnow() - timedelta(hours=36)   # include last night's scan
 
     async with get_session() as db:
-        # Latest analysis per ticker from the last 36 hours
-        subq = (
+        stmt = (
             select(
                 Analysis.ticker,
                 Analysis.final_score,
@@ -44,13 +43,20 @@ async def generate_daily_report(top_n: int = 10) -> dict[str, Any]:
             )
             .join(Stock, Stock.ticker == Analysis.ticker, isouter=True)
             .where(Analysis.timestamp >= since)
-            .order_by(Analysis.ticker, desc(Analysis.timestamp))
-            .distinct(Analysis.ticker)
+            .order_by(desc(Analysis.timestamp))
         )
-        rows = (await db.execute(subq)).all()
+        rows = (await db.execute(stmt)).all()
 
-    # Sort by final_score desc
-    sorted_rows = sorted(rows, key=lambda r: r.final_score or 0, reverse=True)[:top_n]
+    latest_by_ticker = {}
+    for row in rows:
+        if row.ticker not in latest_by_ticker:
+            latest_by_ticker[row.ticker] = row
+
+    sorted_rows = sorted(
+        latest_by_ticker.values(),
+        key=lambda r: r.final_score or 0,
+        reverse=True,
+    )[:top_n]
 
     top_stocks = []
     for row in sorted_rows:

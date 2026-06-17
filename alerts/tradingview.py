@@ -16,11 +16,13 @@ return 200 immediately so TradingView's webhook times out don't pile up.
 
 import asyncio
 import logging
+import re
 from datetime import datetime
 
 from pydantic import BaseModel, field_validator
 
 logger = logging.getLogger(__name__)
+TICKER_RE = re.compile(r"^[A-Z0-9.-]{1,10}$")
 
 # Simple in-memory queue; replace with Redis/RabbitMQ for production scale
 _alert_queue: asyncio.Queue = asyncio.Queue(maxsize=500)
@@ -35,12 +37,18 @@ class TradingViewPayload(BaseModel):
     @field_validator("ticker", mode="before")
     @classmethod
     def normalise_ticker(cls, v: str) -> str:
-        return v.strip().upper()
+        ticker = v.strip().upper()
+        if not TICKER_RE.fullmatch(ticker):
+            raise ValueError("Ticker must be 1-10 chars: A-Z, 0-9, dot, or dash.")
+        return ticker
 
     @field_validator("close", "volume", mode="before")
     @classmethod
     def coerce_numeric(cls, v):
-        return float(v)
+        value = float(v)
+        if value < 0:
+            raise ValueError("Value must be non-negative.")
+        return value
 
 
 class AlertEvent:

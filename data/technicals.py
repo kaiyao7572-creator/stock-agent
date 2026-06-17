@@ -9,6 +9,7 @@ Returned as a TechnicalSnapshot dataclass.
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Optional
 
 import httpx
@@ -41,7 +42,9 @@ class TechnicalSnapshot:
 
 async def _get_candles_polygon(ticker: str, days: int = 250) -> pd.DataFrame:
     """Fetch daily OHLCV from Polygon (requires paid tier for full history)."""
-    url = f"https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/2020-01-01/2099-01-01"
+    end = datetime.utcnow().date()
+    start = end - timedelta(days=days * 2)
+    url = f"https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{start}/{end}"
     params = {"adjusted": "true", "sort": "asc", "limit": days,
               "apiKey": settings.polygon_api_key}
     async with httpx.AsyncClient(timeout=15) as client:

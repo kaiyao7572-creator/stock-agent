@@ -129,7 +129,7 @@ async def run_single_ticker(ticker: str) -> Optional[dict]:
         analysis_text = await complete(sys_prompt, user_prompt)
     except Exception as exc:
         logger.error("Cerebras analysis failed for %s: %s", ticker, exc)
-        analysis_text = f"ERROR: {exc}"
+        return None
 
     bull_case    = _extract_section(analysis_text, "5. Bull Case")
     bear_case    = _extract_section(analysis_text, "6. Bear Case")

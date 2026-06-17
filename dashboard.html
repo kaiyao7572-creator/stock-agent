@@ -3,619 +3,228 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stock Research Agent</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<title>Stock Research Agent - Private Beta</title>
 <style>
-  :root {
-    --bg: #0a0a0f;
-    --surface: #111118;
-    --surface2: #18181f;
-    --surface3: #1e1e28;
-    --border: rgba(255,255,255,0.07);
-    --border2: rgba(255,255,255,0.12);
-    --text: #f0f0f8;
-    --muted: #8888a0;
-    --accent: #7c6af5;
-    --accent2: #5ee8b0;
-    --danger: #f05c5c;
-    --warn: #f0b45c;
-    --success: #5ee8b0;
-    --font: 'Syne', sans-serif;
-    --mono: 'JetBrains Mono', monospace;
-    --radius: 12px;
-    --radius-sm: 8px;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: var(--font);
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    font-size: 14px;
-  }
-
-  /* ── Layout ── */
-  .shell { display: flex; height: 100vh; overflow: hidden; }
-  .sidebar {
-    width: 220px; flex-shrink: 0;
-    background: var(--surface);
-    border-right: 1px solid var(--border);
-    display: flex; flex-direction: column;
-    padding: 24px 0;
-  }
-  .main { flex: 1; overflow-y: auto; padding: 28px 32px; }
-
-  /* ── Sidebar ── */
-  .logo {
-    padding: 0 20px 24px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 16px;
-  }
-  .logo-text { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
-  .logo-sub  { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
-  .logo-dot  { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent2); margin-right: 6px; animation: pulse 2s infinite; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-
-  .nav-item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 9px 20px; cursor: pointer;
-    color: var(--muted); font-size: 13px; font-weight: 500;
-    transition: all 0.15s; border-left: 2px solid transparent;
-  }
-  .nav-item:hover { color: var(--text); background: var(--surface2); }
-  .nav-item.active { color: var(--text); border-left-color: var(--accent); background: var(--surface2); }
-  .nav-item i { font-size: 16px; }
-
-  .server-cfg {
-    margin-top: auto; padding: 16px 20px;
-    border-top: 1px solid var(--border);
-  }
-  .server-cfg label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 6px; font-family: var(--mono); }
-  .server-cfg input {
-    width: 100%; background: var(--surface2); border: 1px solid var(--border2);
-    border-radius: var(--radius-sm); padding: 7px 10px;
-    color: var(--text); font-family: var(--mono); font-size: 11px;
-    outline: none;
-  }
-  .server-cfg input:focus { border-color: var(--accent); }
-  .connect-btn {
-    width: 100%; margin-top: 8px;
-    background: var(--accent); color: #fff; border: none;
-    border-radius: var(--radius-sm); padding: 8px;
-    font-family: var(--font); font-size: 12px; font-weight: 600;
-    cursor: pointer; transition: opacity 0.15s;
-  }
-  .connect-btn:hover { opacity: 0.85; }
-  .status-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 6px; }
-  .status-dot.ok  { background: var(--success); }
-  .status-dot.err { background: var(--danger); }
-  .status-dot.loading { background: var(--warn); animation: pulse 1s infinite; }
-  .status-line { font-size: 11px; color: var(--muted); margin-top: 8px; font-family: var(--mono); }
-
-  /* ── Pages ── */
-  .page { display: none; }
-  .page.active { display: block; }
-
-  /* ── Header ── */
-  .page-header { margin-bottom: 28px; }
-  .page-header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
-  .page-header p  { color: var(--muted); font-size: 13px; margin-top: 4px; }
-
-  /* ── Cards ── */
-  .card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 20px;
-  }
-  .card-sm { padding: 14px 16px; }
-
-  .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 12px; margin-bottom: 24px; }
-  .metric-card {
-    background: var(--surface2); border: 1px solid var(--border);
-    border-radius: var(--radius-sm); padding: 14px 16px;
-  }
-  .metric-label { font-size: 11px; color: var(--muted); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.5px; }
-  .metric-value { font-size: 26px; font-weight: 700; margin-top: 4px; letter-spacing: -1px; }
-  .metric-sub   { font-size: 11px; color: var(--muted); margin-top: 2px; }
-
-  /* ── Stocks table ── */
-  .stocks-grid { display: flex; flex-direction: column; gap: 8px; }
-  .stock-row {
-    background: var(--surface2); border: 1px solid var(--border);
-    border-radius: var(--radius-sm); padding: 14px 18px;
-    display: grid; grid-template-columns: 80px 1fr 100px 100px 120px 100px;
-    align-items: center; gap: 16px; cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
-  }
-  .stock-row:hover { border-color: var(--border2); background: var(--surface3); }
-  .stock-row.header-row {
-    background: transparent; border-color: transparent;
-    font-size: 11px; font-family: var(--mono); color: var(--muted);
-    text-transform: uppercase; cursor: default; padding-bottom: 4px;
-  }
-  .ticker-badge {
-    font-family: var(--mono); font-size: 13px; font-weight: 600;
-    background: var(--surface3); border: 1px solid var(--border2);
-    border-radius: 6px; padding: 4px 8px; display: inline-block; letter-spacing: 0.5px;
-  }
-  .score-bar-wrap { display: flex; align-items: center; gap: 10px; }
-  .score-bar { height: 4px; border-radius: 2px; background: var(--border2); flex: 1; }
-  .score-bar-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
-  .score-num { font-weight: 700; font-size: 15px; min-width: 36px; text-align: right; }
-  .conf-badge {
-    font-size: 11px; font-family: var(--mono); padding: 3px 8px;
-    border-radius: 4px; font-weight: 500;
-  }
-  .conf-high   { background: rgba(94,232,176,0.12); color: var(--success); }
-  .conf-mid    { background: rgba(240,180,92,0.12);  color: var(--warn); }
-  .conf-low    { background: rgba(240,92,92,0.12);   color: var(--danger); }
-
-  /* ── Analysis panel ── */
-  .analysis-panel {
-    position: fixed; top: 0; right: -520px; width: 500px; height: 100vh;
-    background: var(--surface); border-left: 1px solid var(--border);
-    overflow-y: auto; padding: 28px 24px;
-    transition: right 0.3s cubic-bezier(0.4,0,0.2,1);
-    z-index: 100;
-  }
-  .analysis-panel.open { right: 0; }
-  .panel-close {
-    position: absolute; top: 20px; right: 20px;
-    background: var(--surface2); border: 1px solid var(--border);
-    border-radius: 50%; width: 32px; height: 32px;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; font-size: 16px; color: var(--muted);
-    transition: color 0.15s;
-  }
-  .panel-close:hover { color: var(--text); }
-  .panel-ticker { font-size: 28px; font-weight: 700; letter-spacing: -1px; font-family: var(--mono); }
-  .panel-score  { font-size: 48px; font-weight: 700; letter-spacing: -2px; line-height: 1; margin: 8px 0; }
-  .score-mini-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 16px 0; }
-  .score-mini-item {
-    background: var(--surface2); border: 1px solid var(--border);
-    border-radius: var(--radius-sm); padding: 10px 12px;
-  }
-  .score-mini-label { font-size: 10px; color: var(--muted); font-family: var(--mono); text-transform: uppercase; }
-  .score-mini-val   { font-size: 18px; font-weight: 700; margin-top: 2px; }
-  .case-block { margin: 16px 0; }
-  .case-label { font-size: 11px; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
-  .case-label.bull { color: var(--success); }
-  .case-label.bear { color: var(--danger); }
-  .case-text  { font-size: 13px; color: var(--muted); line-height: 1.65; }
-  .analysis-full { font-size: 12px; color: var(--muted); line-height: 1.7; margin-top: 16px; white-space: pre-wrap; font-family: var(--mono); }
-  .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
-
-  /* ── Lookup ── */
-  .lookup-row { display: flex; gap: 10px; margin-bottom: 24px; }
-  .lookup-input {
-    flex: 1; background: var(--surface2); border: 1px solid var(--border2);
-    border-radius: var(--radius-sm); padding: 10px 14px;
-    color: var(--text); font-family: var(--mono); font-size: 14px;
-    outline: none; text-transform: uppercase;
-  }
-  .lookup-input:focus { border-color: var(--accent); }
-  .lookup-btn {
-    background: var(--accent); color: #fff; border: none;
-    border-radius: var(--radius-sm); padding: 10px 20px;
-    font-family: var(--font); font-weight: 600; cursor: pointer;
-    transition: opacity 0.15s; font-size: 13px;
-  }
-  .lookup-btn:hover { opacity: 0.85; }
-  .refresh-btn {
-    background: var(--surface2); color: var(--text); border: 1px solid var(--border2);
-    border-radius: var(--radius-sm); padding: 10px 14px;
-    font-family: var(--font); font-weight: 600; cursor: pointer;
-    transition: background 0.15s; font-size: 13px;
-  }
-  .refresh-btn:hover { background: var(--surface3); }
-
-  /* ── Report ── */
-  .report-md { font-size: 13px; line-height: 1.75; color: var(--muted); white-space: pre-wrap; font-family: var(--mono); }
-  .report-md strong { color: var(--text); }
-
-  /* ── Empty / loading states ── */
-  .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
-  .empty-state i { font-size: 40px; display: block; margin-bottom: 12px; opacity: 0.3; }
-  .empty-state p { font-size: 13px; }
-  .loading-spinner {
-    width: 20px; height: 20px; border: 2px solid var(--border2);
-    border-top-color: var(--accent); border-radius: 50%;
-    animation: spin 0.7s linear infinite; display: inline-block; vertical-align: -5px;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ── Toast ── */
-  .toast {
-    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
-    background: var(--surface3); border: 1px solid var(--border2);
-    border-radius: var(--radius-sm); padding: 10px 20px;
-    font-size: 13px; transition: transform 0.3s; z-index: 200;
-    pointer-events: none;
-  }
-  .toast.show { transform: translateX(-50%) translateY(0); }
-
-  /* ── Chart canvas ── */
-  .chart-wrap { position: relative; height: 220px; width: 100%; }
-
-  /* ── Overlay for panel ── */
-  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99; }
-  .overlay.active { display: block; }
+  :root { color-scheme: dark; --bg:#0b0d12; --panel:#151922; --muted:#9aa4b2; --text:#f4f7fb; --accent:#6ee7b7; --warn:#fbbf24; --bad:#fb7185; --border:#2b3340; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, sans-serif; background:var(--bg); color:var(--text); }
+  header { padding:20px clamp(16px,4vw,36px); border-bottom:1px solid var(--border); background:#10141b; }
+  h1 { margin:0 0 8px; font-size:24px; }
+  .disclaimer { color:#111827; background:var(--warn); padding:10px 12px; border-radius:8px; font-weight:700; max-width:960px; }
+  main { padding:24px clamp(16px,4vw,36px); display:grid; gap:20px; }
+  .controls, .card { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:16px; }
+  .controls { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; align-items:end; }
+  label { display:grid; gap:6px; color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+  input { background:#0f131a; border:1px solid var(--border); color:var(--text); border-radius:6px; padding:10px; font:inherit; }
+  button { background:#2563eb; color:white; border:0; border-radius:6px; padding:10px 12px; font:inherit; font-weight:700; cursor:pointer; }
+  button.secondary { background:#283241; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .status { color:var(--muted); font-size:13px; }
+  .grid { display:grid; gap:10px; }
+  .row { display:grid; grid-template-columns:90px 1fr 120px 150px; gap:12px; align-items:center; padding:12px; border:1px solid var(--border); border-radius:8px; background:#10141b; cursor:pointer; }
+  .row:hover { border-color:#4b5563; }
+  .ticker { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight:800; }
+  .muted { color:var(--muted); }
+  .score { font-weight:800; }
+  .good { color:var(--accent); } .mid { color:var(--warn); } .low { color:var(--bad); }
+  pre { white-space:pre-wrap; color:#cbd5e1; font-family:ui-monospace, SFMono-Regular, Consolas, monospace; font-size:13px; line-height:1.55; }
+  dialog { width:min(840px,92vw); border:1px solid var(--border); border-radius:8px; background:var(--panel); color:var(--text); padding:0; }
+  dialog .modal-head { display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:1px solid var(--border); }
+  dialog .modal-body { padding:16px; display:grid; gap:12px; }
+  @media (max-width:720px) { .row { grid-template-columns:1fr 1fr; } }
 </style>
 </head>
 <body>
-
-<div class="shell">
-  <!-- Sidebar -->
-  <nav class="sidebar">
-    <div class="logo">
-      <div class="logo-text"><span class="logo-dot"></span>StockAgent</div>
-      <div class="logo-sub">AI Research Platform</div>
+<header>
+  <h1>Stock Research Agent <span class="muted">Private Beta</span></h1>
+  <div class="disclaimer">Educational research tool only. Not financial advice. Do your own research before investing.</div>
+</header>
+<main>
+  <section class="controls">
+    <label>API Base URL
+      <input id="baseUrl" placeholder="Same origin by default">
+    </label>
+    <label>API Key for protected actions
+      <input id="apiKey" type="password" placeholder="Stored only in this browser">
+    </label>
+    <label>Lookup ticker
+      <input id="tickerInput" maxlength="10" placeholder="AAPL">
+    </label>
+    <div>
+      <button id="connectBtn">Check Health</button>
+      <button class="secondary" id="lookupBtn">Lookup</button>
+      <button class="secondary" id="refreshBtn">Refresh Analysis</button>
     </div>
-    <div class="nav-item active" onclick="showPage('dashboard')"><i class="ti ti-layout-dashboard"></i> Dashboard</div>
-    <div class="nav-item" onclick="showPage('lookup')"><i class="ti ti-search"></i> Lookup Stock</div>
-    <div class="nav-item" onclick="showPage('report')"><i class="ti ti-file-analytics"></i> Daily Report</div>
-    <div class="nav-item" onclick="showPage('metrics')"><i class="ti ti-chart-line"></i> Accuracy</div>
+    <div class="status" id="status">Not connected</div>
+  </section>
 
-    <div class="server-cfg">
-      <label>API SERVER URL</label>
-      <input type="text" id="serverUrl" value="http://192.168.0.21:8000" placeholder="http://localhost:8000">
-      <button class="connect-btn" onclick="checkHealth()">Connect</button>
-      <div class="status-line" id="statusLine"><span class="status-dot loading" id="statusDot"></span><span id="statusText">not connected</span></div>
-    </div>
-  </nav>
+  <section class="card">
+    <h2>Research Scores</h2>
+    <p class="muted">Latest analyses from the selected API. Scores are research signals, not recommendations.</p>
+    <div class="grid" id="stocks"></div>
+  </section>
 
-  <!-- Main content -->
-  <main class="main">
+  <section class="card">
+    <h2>Daily Report</h2>
+    <button class="secondary" id="reportBtn">Load Report</button>
+    <pre id="report"></pre>
+  </section>
+</main>
 
-    <!-- Dashboard -->
-    <div class="page active" id="page-dashboard">
-      <div class="page-header">
-        <h1>Top Stocks</h1>
-        <p>Highest-scoring stocks from the last 36 hours</p>
-      </div>
-      <div class="metric-grid" id="dash-metrics">
-        <div class="metric-card"><div class="metric-label">Stocks Tracked</div><div class="metric-value" id="m-tracked">—</div></div>
-        <div class="metric-card"><div class="metric-label">Avg Score</div><div class="metric-value" id="m-avgscore">—</div></div>
-        <div class="metric-card"><div class="metric-label">Top Score</div><div class="metric-value" id="m-topscore">—</div></div>
-        <div class="metric-card"><div class="metric-label">High Confidence</div><div class="metric-value" id="m-highconf">—</div></div>
-      </div>
-
-      <div class="card" style="margin-bottom:24px;">
-        <div style="margin-bottom:14px;font-size:12px;color:var(--muted);font-family:var(--mono);">Score Distribution</div>
-        <div class="chart-wrap"><canvas id="scoreChart" role="img" aria-label="Score distribution bar chart"></canvas></div>
-      </div>
-
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-        <div style="font-size:13px;color:var(--muted);">Click any row to view full analysis</div>
-        <button class="refresh-btn" onclick="loadDashboard()"><i class="ti ti-refresh" style="margin-right:4px"></i>Refresh</button>
-      </div>
-
-      <div class="stock-row header-row">
-        <div>Ticker</div><div>Score</div><div>Confidence</div><div>Revenue</div><div>Trend</div><div>News</div>
-      </div>
-      <div class="stocks-grid" id="stocks-list">
-        <div class="empty-state"><i class="ti ti-chart-bar"></i><p>Connect to your server to load data</p></div>
-      </div>
-    </div>
-
-    <!-- Lookup -->
-    <div class="page" id="page-lookup">
-      <div class="page-header">
-        <h1>Stock Lookup</h1>
-        <p>Fetch or trigger analysis for any ticker</p>
-      </div>
-      <div class="lookup-row">
-        <input class="lookup-input" id="lookupTicker" placeholder="AAPL" maxlength="10" onkeydown="if(event.key==='Enter')fetchAnalysis()">
-        <button class="lookup-btn" onclick="fetchAnalysis()">Fetch Analysis</button>
-        <button class="refresh-btn" onclick="triggerRefresh()" title="Trigger new analysis"><i class="ti ti-refresh"></i> Refresh</button>
-      </div>
-      <div id="lookup-result"></div>
-    </div>
-
-    <!-- Report -->
-    <div class="page" id="page-report">
-      <div class="page-header">
-        <h1>Daily Report</h1>
-        <p>Auto-generated nightly research report</p>
-      </div>
-      <button class="refresh-btn" onclick="loadReport()" style="margin-bottom:16px;"><i class="ti ti-refresh" style="margin-right:4px"></i>Load Report</button>
-      <div class="card" id="report-content">
-        <div class="empty-state"><i class="ti ti-file-analytics"></i><p>Click "Load Report" to fetch the latest daily report</p></div>
-      </div>
-    </div>
-
-    <!-- Metrics -->
-    <div class="page" id="page-metrics">
-      <div class="page-header">
-        <h1>Accuracy Metrics</h1>
-        <p>Historical performance tracking — populated after 30+ days of data</p>
-      </div>
-      <button class="refresh-btn" onclick="loadMetrics()" style="margin-bottom:16px;"><i class="ti ti-refresh" style="margin-right:4px"></i>Load Metrics</button>
-      <div id="metrics-content">
-        <div class="empty-state"><i class="ti ti-chart-line"></i><p>Click "Load Metrics" to fetch accuracy data</p></div>
-      </div>
-    </div>
-
-  </main>
-</div>
-
-<!-- Analysis slide-out panel -->
-<div class="overlay" id="overlay" onclick="closePanel()"></div>
-<div class="analysis-panel" id="analysisPanel">
-  <div class="panel-close" onclick="closePanel()"><i class="ti ti-x"></i></div>
-  <div id="panel-content"></div>
-</div>
-
-<!-- Toast -->
-<div class="toast" id="toast"></div>
+<dialog id="modal">
+  <div class="modal-head">
+    <strong id="modalTitle">Analysis</strong>
+    <button class="secondary" id="closeBtn">Close</button>
+  </div>
+  <div class="modal-body" id="modalBody"></div>
+</dialog>
 
 <script>
-let BASE = "http://192.168.0.21:8000";
-let scoreChartInst = null;
+const state = new Map();
+const baseInput = document.getElementById("baseUrl");
+const keyInput = document.getElementById("apiKey");
+const statusEl = document.getElementById("status");
+const stocksEl = document.getElementById("stocks");
+const tickerInput = document.getElementById("tickerInput");
+const reportEl = document.getElementById("report");
+const modal = document.getElementById("modal");
+const modalTitle = document.getElementById("modalTitle");
+const modalBody = document.getElementById("modalBody");
 
-// 🧠 MASTER STATE: ticker -> latest analysis
-const STOCK_STATE = new Map();
+baseInput.value = localStorage.getItem("stockAgentBaseUrl") || "";
+keyInput.value = localStorage.getItem("stockAgentApiKey") || "";
 
-function api(path) {
-  return fetch(BASE + path).then(r => {
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return r.json();
+function baseUrl() {
+  const raw = baseInput.value.trim().replace(/\/$/, "");
+  return raw || window.location.origin;
+}
+
+function headers(protectedAction = false) {
+  const h = { "Accept": "application/json" };
+  if (protectedAction && keyInput.value.trim()) h["X-API-Key"] = keyInput.value.trim();
+  return h;
+}
+
+async function api(path, options = {}) {
+  const res = await fetch(baseUrl() + path, options);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+function text(tag, value, className) {
+  const el = document.createElement(tag);
+  el.textContent = value == null || value === "" ? "N/A" : String(value);
+  if (className) el.className = className;
+  return el;
+}
+
+function scoreClass(score) {
+  if (score >= 75) return "good";
+  if (score >= 55) return "mid";
+  return "low";
+}
+
+function renderRows(stocks) {
+  stocksEl.replaceChildren();
+  if (!stocks.length) {
+    stocksEl.append(text("p", "No analyses found yet.", "muted"));
+    return;
+  }
+  stocks.forEach(stock => {
+    state.set(stock.ticker, stock);
+    const row = document.createElement("div");
+    row.className = "row";
+    row.append(
+      text("div", stock.ticker, "ticker"),
+      text("div", "Research Score", "muted"),
+      text("div", Number(stock.final_score || 0).toFixed(1), `score ${scoreClass(stock.final_score || 0)}`),
+      text("div", `Freshness: ${stock.timestamp || "unknown"}`, "muted")
+    );
+    row.addEventListener("click", () => openAnalysis(stock));
+    stocksEl.append(row);
   });
 }
 
-function toast(msg, dur = 2500) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), dur);
-}
-
-function showPage(name) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById('page-' + name).classList.add('active');
-  event.currentTarget.classList.add('active');
+function openAnalysis(stock) {
+  modalTitle.textContent = `${stock.ticker} research details`;
+  modalBody.replaceChildren();
+  modalBody.append(
+    text("div", `Research Score: ${Number(stock.final_score || 0).toFixed(1)}`),
+    text("div", `Confidence: ${Number(stock.confidence || 0).toFixed(0)}%`),
+    text("div", `Bullish Signals: ${stock.bull_case || "N/A"}`),
+    text("div", `Bearish Signals: ${stock.bear_case || "N/A"}`),
+    text("div", `Data Freshness: ${stock.timestamp || "unknown"}`, "muted"),
+    text("pre", stock.analysis_text || "")
+  );
+  modal.showModal();
 }
 
 async function checkHealth() {
-  BASE = document.getElementById('serverUrl').value.replace(/\/$/, '');
-  const dot  = document.getElementById('statusDot');
-  const text = document.getElementById('statusText');
-
-  dot.className = 'status-dot loading';
-  text.textContent = 'connecting…';
-
+  localStorage.setItem("stockAgentBaseUrl", baseInput.value.trim());
+  localStorage.setItem("stockAgentApiKey", keyInput.value.trim());
+  statusEl.textContent = "Checking...";
   try {
-    const data = await api('/health');
-    dot.className = 'status-dot ok';
-    text.textContent = 'connected';
-    toast('Connected to server');
-    loadDashboard();
-  } catch(e) {
-    dot.className = 'status-dot err';
-    text.textContent = 'connection failed';
-    toast('Cannot reach server — is it running?');
+    await api("/health");
+    statusEl.textContent = "Connected";
+    await loadDashboard();
+  } catch (err) {
+    statusEl.textContent = `Connection failed: ${err.message}`;
   }
-}
-
-function scoreColor(s) {
-  if (s >= 75) return '#5ee8b0';
-  if (s >= 55) return '#f0b45c';
-  return '#f05c5c';
-}
-
-function confClass(c) {
-  if (c >= 80) return 'conf-high';
-  if (c >= 65) return 'conf-mid';
-  return 'conf-low';
 }
 
 async function loadDashboard() {
-  const list = document.getElementById('stocks-list');
-  list.innerHTML = '<div class="empty-state"><span class="loading-spinner"></span></div>';
-
+  stocksEl.replaceChildren(text("p", "Loading...", "muted"));
   try {
-    const stocks = await api('/top-stocks?n=50');
-
-    // 🔥 Deduplicate INTO STATE (latest wins)
-    stocks.forEach(s => {
-      const prev = STOCK_STATE.get(s.ticker);
-
-      if (!prev || new Date(s.timestamp) > new Date(prev.timestamp)) {
-        STOCK_STATE.set(s.ticker, s);
-      }
-    });
-
-    const uniqueStocks = Array.from(STOCK_STATE.values());
-
-    if (!uniqueStocks.length) {
-      list.innerHTML = '<div class="empty-state"><i class="ti ti-mood-empty"></i><p>No analyses found yet.</p></div>';
-      return;
-    }
-
-    // stats
-    const total = uniqueStocks.length;
-    const avgScore = (uniqueStocks.reduce((a,s)=>a+(s.final_score||0),0)/total).toFixed(1);
-    const topScore = Math.max(...uniqueStocks.map(s=>s.final_score||0)).toFixed(1);
-    const highConf = uniqueStocks.filter(s => (s.confidence||0) >= 80).length;
-
-    document.getElementById('m-tracked').textContent = total;
-    document.getElementById('m-avgscore').textContent = avgScore;
-    document.getElementById('m-topscore').textContent = topScore;
-    document.getElementById('m-highconf').textContent = highConf;
-
-    renderScoreChart(uniqueStocks);
-
-    list.innerHTML = '';
-
-    uniqueStocks.forEach(s => {
-      const row = document.createElement('div');
-      row.className = 'stock-row';
-
-      const sc = s.final_score || 0;
-      const co = s.confidence || 0;
-
-      row.innerHTML = `
-        <div><span class="ticker-badge">${s.ticker}</span></div>
-        <div class="score-bar-wrap">
-          <div class="score-bar">
-            <div class="score-bar-fill" style="width:${Math.round(sc)}%;background:${scoreColor(sc)}"></div>
-          </div>
-          <span class="score-num" style="color:${scoreColor(sc)}">${sc.toFixed(1)}</span>
-        </div>
-        <div><span class="conf-badge ${confClass(co)}">${co.toFixed(0)}%</span></div>
-        <div style="color:var(--muted);font-family:var(--mono);font-size:12px">${(s.revenue_score||0).toFixed(0)}</div>
-        <div style="color:var(--muted);font-family:var(--mono);font-size:12px">${(s.trend_score||0).toFixed(0)}</div>
-        <div style="color:var(--muted);font-family:var(--mono);font-size:12px">${(s.news_score||0).toFixed(0)}</div>
-      `;
-
-      // 🔥 ALWAYS use latest from state (no stale clicks)
-      row.addEventListener('click', () => {
-        openPanel(STOCK_STATE.get(s.ticker));
-      });
-
-      list.appendChild(row);
-    });
-
-  } catch(e) {
-    list.innerHTML = '<div class="empty-state"><i class="ti ti-wifi-off"></i><p>Could not load data</p></div>';
+    renderRows(await api("/top-stocks?n=50"));
+  } catch (err) {
+    stocksEl.replaceChildren(text("p", `Could not load dashboard: ${err.message}`, "muted"));
   }
 }
 
-function renderScoreChart(stocks) {
-  const buckets = [0,0,0,0,0];
-
-  stocks.forEach(s => {
-    const sc = s.final_score || 0;
-    if (sc < 40) buckets[0]++;
-    else if (sc < 55) buckets[1]++;
-    else if (sc < 70) buckets[2]++;
-    else if (sc < 85) buckets[3]++;
-    else buckets[4]++;
-  });
-
-  const ctx = document.getElementById('scoreChart').getContext('2d');
-  if (scoreChartInst) scoreChartInst.destroy();
-
-  scoreChartInst = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: ['<40','40-55','55-70','70-85','85+'],
-      datasets: [{
-        label: 'Stocks',
-        data: buckets,
-        backgroundColor: ['#f05c5c','#f0b45c','#f0b45c','#5ee8b0','#5ee8b0'],
-        borderRadius: 4,
-        borderSkipped: false,
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8888a0' } },
-        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8888a0' } }
-      }
-    }
-  });
-}
-
-function openPanel(stock) {
-  const el = document.getElementById('panel-content');
-  const sc = stock.final_score || 0;
-  const co = stock.confidence || 0;
-
-  el.innerHTML = `
-    <div style="margin-bottom:20px">
-      <div class="panel-ticker">${stock.ticker}</div>
-      <div class="panel-score" style="color:${scoreColor(sc)}">${sc.toFixed(1)}</div>
-      <span class="conf-badge ${confClass(co)}">Confidence: ${co.toFixed(0)}%</span>
-    </div>
-    <hr class="divider">
-
-    <div class="score-mini-grid">
-      <div class="score-mini-item"><div class="score-mini-label">Revenue</div><div class="score-mini-val">${(stock.revenue_score||0).toFixed(0)}</div></div>
-      <div class="score-mini-item"><div class="score-mini-label">Earnings</div><div class="score-mini-val">${(stock.earnings_score||0).toFixed(0)}</div></div>
-      <div class="score-mini-item"><div class="score-mini-label">Trend</div><div class="score-mini-val">${(stock.trend_score||0).toFixed(0)}</div></div>
-      <div class="score-mini-item"><div class="score-mini-label">Volume</div><div class="score-mini-val">${(stock.volume_score||0).toFixed(0)}</div></div>
-      <div class="score-mini-item"><div class="score-mini-label">News</div><div class="score-mini-val">${(stock.news_score||0).toFixed(0)}</div></div>
-      <div class="score-mini-item"><div class="score-mini-label">Health</div><div class="score-mini-val">${(stock.health_score||0).toFixed(0)}</div></div>
-    </div>
-
-    <hr class="divider">
-
-    ${stock.bull_case ? `<div class="case-block"><div class="case-label bull">Bull Case</div><div class="case-text">${stock.bull_case}</div></div>` : ''}
-    ${stock.bear_case ? `<div class="case-block"><div class="case-label bear">Bear Case</div><div class="case-text">${stock.bear_case}</div></div>` : ''}
-
-    <hr class="divider">
-
-    <div class="analysis-full">${stock.analysis_text || ''}</div>
-  `;
-
-  document.getElementById('analysisPanel').classList.add('open');
-  document.getElementById('overlay').classList.add('active');
-}
-
-function closePanel() {
-  document.getElementById('analysisPanel').classList.remove('open');
-  document.getElementById('overlay').classList.remove('active');
-}
-
-async function fetchAnalysis() {
-  const ticker = document.getElementById('lookupTicker').value.trim().toUpperCase();
-  if (!ticker) return toast('Enter a ticker symbol');
-
-  const res = document.getElementById('lookup-result');
-  res.innerHTML = '<div class="empty-state"><span class="loading-spinner"></span></div>';
-
+async function lookup() {
+  const ticker = tickerInput.value.trim().toUpperCase();
+  if (!ticker) return;
   try {
-    const stock = await api('/analysis/' + ticker);
-
-    // 🔥 update state immediately
-    STOCK_STATE.set(ticker, stock);
-
-    loadDashboard();
-
-    const sc = stock.final_score || 0;
-    const co = stock.confidence || 0;
-
-    res.innerHTML = `
-      <div class="card">
-        <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:16px">
-          <span class="ticker-badge">${stock.ticker}</span>
-          <span style="font-size:36px;font-weight:700;color:${scoreColor(sc)}">${sc.toFixed(1)}</span>
-          <span class="conf-badge ${confClass(co)}">${co.toFixed(0)}%</span>
-        </div>
-      </div>
-    `;
-  } catch(e) {
-    res.innerHTML = `<div class="empty-state"><p>No analysis found for ${ticker}</p></div>`;
+    const stock = await api(`/analysis/${encodeURIComponent(ticker)}`);
+    state.set(stock.ticker, stock);
+    openAnalysis(stock);
+  } catch (err) {
+    statusEl.textContent = `Lookup failed: ${err.message}`;
   }
 }
 
-async function triggerRefresh() {
-  const ticker = document.getElementById('lookupTicker').value.trim().toUpperCase();
-  if (!ticker) return toast('Enter ticker first');
-
-  await fetch(BASE + '/analysis/' + ticker + '/refresh', { method: 'POST' });
-
-  toast('Refreshing ' + ticker + '...');
-
-  setTimeout(async () => {
-    const updated = await api('/analysis/' + ticker);
-    STOCK_STATE.set(ticker, updated);
-    loadDashboard();
-  }, 4000);
+async function refreshAnalysis() {
+  const ticker = tickerInput.value.trim().toUpperCase();
+  if (!ticker) return;
+  localStorage.setItem("stockAgentApiKey", keyInput.value.trim());
+  try {
+    await api(`/analysis/${encodeURIComponent(ticker)}/refresh`, {
+      method: "POST",
+      headers: headers(true),
+    });
+    statusEl.textContent = `Refresh queued for ${ticker}`;
+  } catch (err) {
+    statusEl.textContent = `Refresh rejected: ${err.message}`;
+  }
 }
 
-setTimeout(checkHealth, 500);
+async function loadReport() {
+  reportEl.textContent = "Loading...";
+  try {
+    const report = await api("/report/daily");
+    reportEl.textContent = report.markdown || "No report available.";
+  } catch (err) {
+    reportEl.textContent = `Could not load report: ${err.message}`;
+  }
+}
 
-
-// Auto-try to connect on load
-setTimeout(checkHealth, 500);
+document.getElementById("connectBtn").addEventListener("click", checkHealth);
+document.getElementById("lookupBtn").addEventListener("click", lookup);
+document.getElementById("refreshBtn").addEventListener("click", refreshAnalysis);
+document.getElementById("reportBtn").addEventListener("click", loadReport);
+document.getElementById("closeBtn").addEventListener("click", () => modal.close());
+tickerInput.addEventListener("keydown", e => { if (e.key === "Enter") lookup(); });
+checkHealth();
 </script>
 </body>
 </html>

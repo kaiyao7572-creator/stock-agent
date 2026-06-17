@@ -9,35 +9,56 @@ Routes:
   GET  /health               — liveness check
   GET  /metrics              — historical accuracy stats
 """
-from fastapi import Header, HTTPException, Depends
 import asyncio
 import logging
+import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import Any
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 from sqlalchemy import desc, select
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 from config import get_settings
 from database.database import init_db, get_session
-from database.models   import Analysis, PerformanceTracking, Stock
+from database.models   import Analysis, PerformanceTracking
 from alerts.tradingview import TradingViewPayload, enqueue_alert, get_alert_queue
 from reports.generator  import generate_daily_report
 from scheduler.daily_scan import run_single_ticker, run_daily_scan
 
-API_KEY = "123"
+TICKER_RE = re.compile(r"^[A-Z0-9.-]{1,10}$")
+_rate_limits: dict[tuple[str, str], list[datetime]] = {}
 
-def verify_api_key(x_api_key: str = Header(None)):
-    if x_api_key != API_KEY:
+
+def require_api_key(x_api_key: str = Header(default="")):
+    if not settings.app_api_key:
+        raise HTTPException(status_code=503, detail="API key auth is not configured.")
+    if x_api_key != settings.app_api_key:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key.")
+
+
+def validate_ticker(ticker: str) -> str:
+    value = ticker.upper().strip()
+    if not TICKER_RE.fullmatch(value):
         raise HTTPException(
-            status_code=401,
-            detail="Invalid or missing API Key"
+            status_code=422,
+            detail="Ticker must be 1-10 chars: A-Z, 0-9, dot, or dash.",
         )
+    return value
+
+
+def rate_limit(bucket: str, limit: int, request: Request) -> None:
+    now = datetime.utcnow()
+    key = (bucket, request.client.host if request.client else "unknown")
+    recent = [ts for ts in _rate_limits.get(key, []) if now - ts < timedelta(minutes=1)]
+    if len(recent) >= limit:
+        raise HTTPException(status_code=429, detail="Rate limit exceeded. Try again later.")
+    recent.append(now)
+    _rate_limits[key] = recent
 
 logging.basicConfig(
     level=logging.INFO,
@@ -67,17 +88,24 @@ async def lifespan(app: FastAPI):
     await init_db()
     asyncio.create_task(_alert_consumer())
 
-    # Schedule nightly scan at 23:00 UTC
-    scheduler.add_job(run_daily_scan, "cron", hour=23, minute=0,
-                      id="daily_scan", replace_existing=True)
-    scheduler.start()
-    logger.info("Scheduler started.")
+    if settings.enable_scheduler:
+        scheduler.add_job(
+            run_daily_scan,
+            CronTrigger.from_crontab(settings.daily_scan_cron),
+            id="daily_scan",
+            replace_existing=True,
+        )
+        scheduler.start()
+        logger.info("Scheduler started. Ensure this is the only running instance.")
+    else:
+        logger.info("Scheduler disabled. Set ENABLE_SCHEDULER=true for one instance only.")
 
     yield
 
     # Shutdown
-    scheduler.shutdown(wait=False)
-    logger.info("Scheduler stopped.")
+    if scheduler.running:
+        scheduler.shutdown(wait=False)
+        logger.info("Scheduler stopped.")
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
@@ -91,7 +119,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -124,11 +152,12 @@ async def health():
     return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
 
 
-@app.post("/webhook/tradingview")
-async def tradingview_webhook(payload: TradingViewPayload):
+@app.post("/webhook/tradingview", dependencies=[Depends(require_api_key)])
+async def tradingview_webhook(payload: TradingViewPayload, request: Request):
     """
     Receive TradingView alert.  Enqueues analysis and returns 200 immediately.
     """
+    rate_limit("webhook", settings.webhook_rate_limit_per_minute, request)
     ok = await enqueue_alert(payload)
     if not ok:
         raise HTTPException(status_code=503, detail="Alert queue full. Retry later.")
@@ -138,7 +167,7 @@ async def tradingview_webhook(payload: TradingViewPayload):
 @app.get("/analysis/{ticker}")
 async def get_analysis(ticker: str):
     """Return the most recent analysis for a ticker."""
-    ticker = ticker.upper().strip()
+    ticker = validate_ticker(ticker)
     async with get_session() as db:
         stmt = (
             select(Analysis)
@@ -153,16 +182,20 @@ async def get_analysis(ticker: str):
     return _analysis_to_dict(row)
 
 
-@app.post("/analysis/{ticker}/refresh")
-async def refresh_analysis(ticker: str, background_tasks: BackgroundTasks):
+@app.post("/analysis/{ticker}/refresh", dependencies=[Depends(require_api_key)])
+async def refresh_analysis(ticker: str, background_tasks: BackgroundTasks, request: Request):
     """Trigger a fresh on-demand analysis (runs in background)."""
-    ticker = ticker.upper().strip()
+    rate_limit("refresh", settings.refresh_rate_limit_per_minute, request)
+    ticker = validate_ticker(ticker)
     background_tasks.add_task(run_single_ticker, ticker)
     return {"status": "started", "ticker": ticker}
 
 
 @app.get("/top-stocks")
-async def top_stocks(n: int = 10, since_hours: int = 36):
+async def top_stocks(
+    n: int = Query(default=10, ge=1, le=50),
+    since_hours: int = Query(default=36, ge=1, le=168),
+):
     """Return the top N stocks by final_score from the last `since_hours`."""
     cutoff = datetime.utcnow() - timedelta(hours=since_hours)
     async with get_session() as db:
